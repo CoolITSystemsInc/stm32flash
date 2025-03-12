@@ -51,6 +51,6 @@ jobs:
     - name: Upload stm32flash binary
       uses: actions/upload-artifact@v4
       with:
-        name: stm32flash${{ matrix.arch == 'aarch64-linux-musl' && '-64' || '' }
+        name: stm32flash${{ matrix.arch == 'aarch64-linux-musl' && '-64' || '' }}
         path: ./stm32flash
 
