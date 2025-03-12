@@ -4,46 +4,53 @@ on:
   push:
     branches:
       - master
-      - cicd
   pull_request:
     branches:
       - master
-  schedule:
-    - cron: '0 9 * * 0'
   workflow_dispatch:
       
-env:
-  xcompile_vars: 'CC=arm-linux-musleabihf-gcc CXX=arm-linux-musleabihf-g++ INCLUDE="-I/usr/arm-linux-musleabihf/include/"'
-
 jobs:
   build-stm32flash:
+    name: Run cross-compiler download and verification for each architecture
+    strategy:
+      matrix:
+        arch:
+           - arm-linux-musleabihf
+           #- aarch64-linux-musl
+    
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v2
+    - name: Set environment variables based on architecture
+      run: |
+        echo "Setting environment variables based on architecture"
+        echo "xcompile_vars=CC=${{ matrix.arch }}-gcc CXX=${{ matrix.arch }}-g++ INCLUDE=-I/usr/${{ matrix.arch }}/include/" >> $GITHUB_ENV
 
-    - name: Set up cross-compiler
-      uses: dawidd6/action-download-artifact@v2
+    - uses: actions/checkout@v4
+
+    - name: Download musl-cross-compiler library from release
+      id: musl-cross-compiler
+      uses: robinraju/release-downloader@v1.8
       with:
-        repo: coolitsystemsinc/cdu-build
-        github_token: ${{ secrets.ACTIONS_AUTH }}        
-        workflow: musl-artifact.yaml
-        workflow_conclusion: success
-        name: arm-linux-musleabihf-cross
-        path: .
+        repository: coolitsystemsinc/cdu-lib
+        latest: true
+        token: ${{ secrets.ACTIONS_AUTH }}
+        fileName: "${{ matrix.arch }}-cross.tgz"
+        extract: false
+        out-file-path: .
 
     - name: Copy cross-compiler to usr folder
       run: |
-        tar -xvf arm-linux-musleabihf-cross.tgz
-        sudo cp -r ./arm-linux-musleabihf-cross/* /usr/
+        tar -xvf ${{ matrix.arch }}-cross.tgz
+        sudo cp -r ./${{ matrix.arch }}-cross/* /usr/
 
     - name: Compile stm32flash
       run: |
-        sudo make ${{ env.xcompile_vars }}
+        sudo make $xcompile_vars
     
     - name: Upload stm32flash binary
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v4
       with:
-        name: stm32flash
+        name: stm32flash${{ matrix.arch == 'aarch64-linux-musl' && '-64' || '' }
         path: ./stm32flash
 
